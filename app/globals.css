@@ -82,7 +82,9 @@
   --sidebar-ring: oklch(0.396 0.141 25.723);
 }
 
-
+.grid-auto {
+  grid-template-columns: repeat(auto-fit, minmax(353px, 1fr))
+}
 
 
 

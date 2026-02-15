@@ -5,7 +5,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Container } from "@/components/shared/container";
-import { Button, Checkbox, InputOTP, InputOTPGroup, InputOTPSlot, TelegramAuth, Toggle } from "../ui";
+import { Button, Checkbox, InputOTP, InputOTPGroup, InputOTPSlot } from "../ui";
 import {
     NavigationMenu,
     NavigationMenuContent,
@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/navigation-menu"
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -36,11 +35,12 @@ import {
     SheetTitle,
     SheetTrigger,
     SheetClose,
+    SheetFooter,
 } from "@/components/ui/sheet"
-import { Menu, X, Home, Info, Phone, Mail, Gift, HelpCircle, Utensils, Bike, Calendar, Users } from "lucide-react"
-import { InputOTPSeparator } from "../ui/input-otp";
+import { Menu, X, Info, Phone, Mail, Gift, HelpCircle, Utensils, Bike, Calendar, Users, Minus, Plus, Trash2 } from "lucide-react"
 import { REGEXP_ONLY_DIGITS } from "input-otp"
 import { toast } from "sonner";
+import { useCart } from "@/contexts/cart-context"; // Импортируем хук из контекста
 
 interface Props {
     className?: string;
@@ -73,8 +73,8 @@ const components: { title: string; href: string; description: string; icon?: Rea
     },
     {
         title: "FAQ",
-        href: "/faq",
-        description: "Ответы на часто задаваемые вопросы.",
+        href: "/knowledge",
+        description: "Узнать о Нас побольше.",
         icon: <HelpCircle className="h-4 w-4" />,
     },
 ];
@@ -102,13 +102,8 @@ const services: { title: string; href: string; description: string; icon: React.
 
 // Функция для форматирования номера телефона
 const formatPhoneNumber = (value: string) => {
-    // Удаляем все нецифровые символы
     const numbers = value.replace(/\D/g, '');
-
-    // Если номер пустой, возвращаем пустую строку
     if (!numbers) return '';
-
-    // Форматируем номер: +7 (XXX) XXX-XX-XX
     if (numbers.length <= 1) {
         return `+7 (${numbers}`;
     } else if (numbers.length <= 4) {
@@ -122,30 +117,40 @@ const formatPhoneNumber = (value: string) => {
     }
 };
 
-// Функция для валидации номера телефона (проверяем, что введено 11 цифр)
+// Функция для валидации номера телефона
 const isValidPhoneNumber = (value: string) => {
     const numbers = value.replace(/\D/g, '');
-    return numbers.length === 11; // +7 и 10 цифр = 11
+    return numbers.length === 11;
 };
+
+// Вспомогательная функция для склонения слов
+function getWordForm(number: number, forms: [string, string, string]) {
+    const cases = [2, 0, 1, 1, 1, 2];
+    return forms[
+        number % 100 > 4 && number % 100 < 20 ? 2 : cases[Math.min(number % 10, 5)]
+    ];
+}
 
 export const Header: React.FC<Props> = ({ className }) => {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+    const [isCartOpen, setIsCartOpen] = React.useState(false);
     const [isLoginDialogOpen, setIsLoginDialogOpen] = React.useState(false);
     const [phoneNumber, setPhoneNumber] = React.useState('');
     const [otpValue, setOtpValue] = React.useState('');
     const [isAgreed, setIsAgreed] = React.useState(false);
 
+    // Используем хук корзины
+    const { items, removeItem, updateQuantity, clearCart, totalItems, totalPrice } = useCart();
+
     const [isDarkTheme, setIsDarkTheme] = React.useState(() => {
-        // Проверяем, есть ли сохраненная тема в localStorage
         if (typeof window !== 'undefined') {
             const savedTheme = localStorage.getItem('theme');
-            // Если есть сохраненная тема, используем её, иначе true (темная по умолчанию)
             return savedTheme ? savedTheme === 'dark' : true;
         }
-        return true; // По умолчанию темная
+        return true;
     });
 
-    // Обновляем тему при изменении isDarkTheme
+    // Обновление темы
     React.useEffect(() => {
         if (isDarkTheme) {
             document.documentElement.classList.add('dark');
@@ -163,11 +168,6 @@ export const Header: React.FC<Props> = ({ className }) => {
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const formatted = formatPhoneNumber(e.target.value);
         setPhoneNumber(formatted);
-    };
-
-    const handleRequestCode = () => {
-        console.log('Запрос кода для номера:', phoneNumber);
-        // Здесь логика отправки кода
     };
 
     // Проверяем, валидный ли номер и согласие
@@ -227,9 +227,9 @@ export const Header: React.FC<Props> = ({ className }) => {
                     </NavigationMenuList>
                 </NavigationMenu>
 
-                {/* Правая часть с кнопками - все в одной строке */}
+                {/* Правая часть с кнопками */}
                 <div className="flex items-center gap-2">
-                    {/* Группа кнопок для десктопа - тема и вход в одной строке */}
+                    {/* Группа кнопок для десктопа */}
                     <div className="hidden md:flex items-center gap-2">
                         {/* Диалог входа для десктопа */}
                         <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
@@ -289,7 +289,6 @@ export const Header: React.FC<Props> = ({ className }) => {
                                                     </InputOTPGroup>
                                                 </InputOTP>
                                             </div>
-
                                         </Field>
                                         <FieldLabel>
                                             <Field orientation="horizontal" className="items-center">
@@ -308,7 +307,17 @@ export const Header: React.FC<Props> = ({ className }) => {
                                         </FieldLabel>
                                     </FieldGroup>
                                     <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
-                                        <TelegramAuth />
+                                        <Button
+                                            variant="default"
+                                            onClick={() =>
+                                                toast.success("Код отправлен на SMS", {
+                                                    description: "Введите 6-значный код из SMS!",
+                                                    position: "top-center",
+                                                })
+                                            }
+                                        >
+                                            Отправить код
+                                        </Button>
                                     </DialogFooter>
                                 </form>
                             </DialogContent>
@@ -316,17 +325,177 @@ export const Header: React.FC<Props> = ({ className }) => {
                     </div>
 
                     {/* Корзина */}
-                    <Link href="/cart" className="flex gap-1 bg-primary px-[10px] h-8 rounded-md items-center px-2 md:px-3">
-                        <p className="ml-1 text-[14px] flex gap-1 items-center justify-center">
-                            <span id="cart_summart">0</span>
-                            ₽
-                        </p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-shopping-bag">
-                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                            <path d="M3 6h18" />
-                            <path d="M16 10a4 4 0 0 1-8 0" />
-                        </svg>
-                    </Link>
+                    <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+                        <SheetTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                className="flex gap-1 bg-primary px-[10px] h-8 rounded-md items-center px-2 md:px-3 hover:bg-primary/90 relative"
+                            >
+                                {totalItems > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                        {totalItems}
+                                    </span>
+                                )}
+                                <p className="ml-1 text-[14px] flex gap-1 items-center justify-center">
+                                    <span>{totalPrice}</span>
+                                    ₽
+                                </p>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-shopping-bag">
+                                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                                    <path d="M3 6h18" />
+                                    <path d="M16 10a4 4 0 0 1-8 0" />
+                                </svg>
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent className="w-full sm:max-w-lg flex flex-col p-0">
+                            <SheetHeader className="p-4 border-b">
+                                <SheetTitle className="flex items-center justify-between">
+                                    <span>Корзина</span>
+                                    {items.length > 0 && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={clearCart}
+                                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                        >
+                                            Очистить
+                                        </Button>
+                                    )}
+                                </SheetTitle>
+                                <SheetDescription>
+                                    {items.length === 0
+                                        ? "Ваша корзина пуста"
+                                        : `В корзине ${totalItems} ${getWordForm(totalItems, ['товар', 'товара', 'товаров'])}`
+                                    }
+                                </SheetDescription>
+                            </SheetHeader>
+
+                            {items.length === 0 ? (
+                                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                                    <div className="w-24 h-24 mb-4 text-muted-foreground">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                                            <path d="M3 6h18" />
+                                            <path d="M16 10a4 4 0 0 1-8 0" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-lg font-medium mb-2">Корзина пуста</h3>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Добавьте блюда из меню, чтобы оформить заказ
+                                    </p>
+                                    <SheetClose asChild>
+                                        <Button onClick={() => setIsCartOpen(false)}>
+                                            Перейти в меню
+                                        </Button>
+                                    </SheetClose>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                        {items.map((item) => (
+                                            <div
+                                                key={item.id}
+                                                className="flex gap-4 p-3 rounded-lg border bg-card"
+                                            >
+                                                {item.image && (
+                                                    <div className="w-20 h-20 rounded-md overflow-hidden flex-shrink-0">
+                                                        <Image
+                                                            src={item.image}
+                                                            alt={item.name}
+                                                            width={80}
+                                                            height={80}
+                                                            className="object-cover w-full h-full"
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <div>
+                                                            <h4 className="font-medium truncate">{item.name}</h4>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {item.price} ₽
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                            onClick={() => removeItem(item.id)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+
+                                                    {item.options && item.options.length > 0 && (
+                                                        <div className="mt-1 text-xs text-muted-foreground">
+                                                            {item.options.map(opt => opt.title).join(', ')}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-7 w-7"
+                                                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                        >
+                                                            <Minus className="h-3 w-3" />
+                                                        </Button>
+                                                        <span className="w-8 text-center text-sm">
+                                                            {item.quantity}
+                                                        </span>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-7 w-7"
+                                                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                        >
+                                                            <Plus className="h-3 w-3" />
+                                                        </Button>
+                                                        <span className="ml-auto font-medium">
+                                                            {item.price * item.quantity} ₽
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <SheetFooter className="border-t p-4 flex-col gap-4">
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Товаров:</span>
+                                                <span>{totalItems} {getWordForm(totalItems, ['шт', 'шт', 'шт'])}</span>
+                                            </div>
+                                            <div className="flex justify-between text-lg font-bold">
+                                                <span>Итого:</span>
+                                                <span>{totalPrice} ₽</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 w-full">
+                                            <SheetClose asChild>
+                                                <Button variant="outline" className="flex-1">
+                                                    Продолжить покупки
+                                                </Button>
+                                            </SheetClose>
+                                            <Button
+                                                className="flex-1"
+                                                onClick={() => {
+                                                    setIsCartOpen(false);
+                                                    toast.success('Заказ оформлен!', {
+                                                        description: 'Скоро с вами свяжется оператор',
+                                                    });
+                                                    // Здесь можно добавить логику оформления заказа
+                                                }}
+                                            >
+                                                Оформить заказ
+                                            </Button>
+                                        </div>
+                                    </SheetFooter>
+                                </>
+                            )}
+                        </SheetContent>
+                    </Sheet>
 
                     {/* Мобильное меню */}
                     <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -340,9 +509,6 @@ export const Header: React.FC<Props> = ({ className }) => {
                                 <SheetTitle className="flex items-center justify-between">
                                     <span className="font-serif font-light text-xl">В ГОСТИ</span>
                                     <SheetClose asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <X className="h-4 w-4" />
-                                        </Button>
                                     </SheetClose>
                                 </SheetTitle>
                                 <SheetDescription className="text-left">

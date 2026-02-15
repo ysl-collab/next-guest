@@ -2,7 +2,6 @@ import Image from "next/image";
 import { Button } from "@/components/ui/index";
 import { Container } from "@/components/shared/container";
 import { Title } from "@/components/ui";
-import { Categories } from "@/components/shared/categories";
 
 export default function Cart() {
     return (
